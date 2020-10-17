@@ -1,0 +1,184 @@
+----INSERIR UM CLIENTE SOMENTE SE ELE NASCEU APÓS 13/10/1993
+CREATE PROCEDURE CLIENTE_DATA
+@nome varchar(30),
+@endereço varchar(30),
+@telefone varchar(15),
+@email varchar(40),
+@data_nasc datetime
+AS
+BEGIN
+   DECLARE @VALIDAR int;
+   SET @VALIDAR=DATEDIFF(day, '1993-10-13', getdate());
+   DECLARE @NASCIMENTO INT;
+   SET @NASCIMENTO= DATEDIFF(day, @data_nasc, getdate());
+   
+IF (@nascimento < @validar)
+BEGIN
+   INSERT INTO cliente (nome, data_nasc, endereço, telefone, email) values (@nome, @data_nasc, @endereço, @telefone, @email);
+END
+END
+
+
+
+----Inserir um produto somente se houver pelo menos um item dele no estoque e se não está
+vencido
+create procedure estoque_vencido
+@preço_venda decimal,
+@descrição varchar(30),
+@data_validade Date,
+@preço_custo decimal,
+@estoque int,
+@dist_cod_dist int
+as
+begin
+    declare @cod_prod int;
+
+    select * from produtos where cod_prod = @cod_prod
+
+    if(@estoque > 0 and @data_validade > CURRENT_TIMESTAMP)
+    begin
+        insert into produtos (preço_venda, descriçao, data_validade, preço_custo, estoque,dist_cod_dist) 
+        values(@preço_venda, @descrição, @data_validade, @preço_custo, @estoque, @dist_cod_dist)
+		print('salvo')
+	end
+	else
+	begin
+		print('não foi possivel salvar')
+	end
+end
+
+
+
+----INSERIR UM DISTRIBUIDOR SOMENTE SE SEU NOME FANTASIA E RAZÃO SOCIAL FOREM DIFERENTES
+CREATE PROCEDURE INSERIR_DIST
+@nome_fantasia varchar(35),
+@razao_social varchar(35),
+@telefone varchar(15),
+@email varchar(25)
+AS
+BEGIN
+    IF(@nome_fantasia <> @razao_social)
+    BEGIN 
+    INSERT INTO distribuidores (nome_fantasia, razao_social, telefone, email) values (@nome_fantasia, @razao_social, @telefone, @email);
+END
+END
+
+
+
+----Inserir uma venda somente se ela for maior que R$ 2000,00; ou se ela for menor que R$
+1000,00 e maior que R$ 0,00
+create procedure inserir_venda
+@data_hora datetime,
+@total decimal,
+@cli_cod_cli int
+as
+begin 
+
+
+    if(@total >2000 or @total <1000 and @total > 0)
+
+    begin
+        insert into vendas(data_hora, total, cli_cod_cli)
+        values(@data_hora, @total, @cli_cod_cli)
+    end
+end
+
+
+
+
+----INSERIR UM CLIENTE SOMENTE SE SEU NOME TERMINAR COM 'EU'
+CREATE PROCEDURE INSERIR_CLIENTE_EU
+@nome varchar(30),
+@endereço varchar(30),
+@telefone varchar(15),
+@e_mail varchar(40),
+@data_nasc datetime
+AS
+BEGIN
+    IF( RIGHT(@nome, 2)= 'eu')
+    BEGIN
+    INSERT INTO cliente (nome, data_nasc, endereço, telefone, email) values (@nome, @data_nasc, @endereço, @telefone, @e_mail);
+END
+END
+
+
+
+
+----Atualizar a quantidade de um determinado produto em estoque, sempre que uma venda
+com aquele produto for realizada
+create trigger atlza_prod
+on itens_venda
+instead of insert as
+begin
+
+	declare @quantidade int
+	select @quantidade = quantidade from inserted
+	declare @prod_cod_prod int
+	select @prod_cod_prod = prod_cod_prod from inserted
+	declare @estoque int
+	select @estoque = estoque from produtos where cod_prod = @prod_cod_prod
+
+
+    if(@estoque > @quantidade)
+    begin 
+        set @estoque = @estoque-@quantidade
+        update produtos
+		Set @estoque = estoque
+		where cod_prod = @prod_cod_prod
+    end
+end
+
+
+
+
+----EXIBIR NOME FANTASIA E RAZÃO SOCIAL APÓS UM PRODUTO NOVO ADICIONADO
+CREATE TRIGGER EXIBIR_NOMEFANTASIA
+ON produtos
+AFTER INSERT AS
+BEGIN
+
+    DECLARE @dist_cod_dist INT;
+
+    SET @dist_cod_dist=(SELECT dist_cod_dist FROM INSERTED);
+
+    SELECT nome_fantasia, razao_social FROM distribuidores WHERE cod_dist=@dist_cod_dist;
+END
+
+
+
+
+----EXIBIR NOME, EMAIL DO CLIENTE QUANDO NOVA VENDA ATRIBUIDA A ELE
+CREATE TRIGGER EXB_NOMECLIENTE
+ON vendas
+AFTER INSERT AS 
+BEGIN
+   
+    DECLARE @codigocliente INT;
+
+    SET @codigocliente=(SELECT cli_cod_cli FROM inserted);
+
+    SELECT nome, email from cliente WHERE cod_cli=@codigocliente;
+  
+END
+
+
+
+----Impedir a inserção de uma venda caso ela seja menor ou igual à R$ 0,00
+create trigger verifica_venda
+on vendas
+instead of insert 
+as
+begin
+    declare @total int
+    select @total = total from inserted
+    if(@total > 0)
+    begin
+        insert into vendas
+        select data_hora , total , cli_cod_cli  from inserted;
+    end
+    else
+    begin
+        PRINT('houve uma tentativa de inserção com valor negativo')
+    end
+
+end
